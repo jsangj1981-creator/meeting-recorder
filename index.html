@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>미팅 녹음</title>
+  <meta name="theme-color" content="#FFFFFF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="미팅녹음">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" href="icons/icon-180.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 녹음 화면 -->
+  <section class="screen" id="screen-record" hidden>
+    <header class="bar">
+      <button class="link" id="btnCancelRec" type="button">녹음 취소</button>
+      <span class="bar-title" id="recTitle"></span>
+      <span class="bar-spacer"></span>
+    </header>
+
+    <div class="rec-body">
+      <p class="rec-state" id="recState"><span class="dot"></span>녹음 중</p>
+      <p class="rec-timer" id="recTimer">00:00</p>
+      <div class="meter" aria-hidden="true"><div id="meterFill"></div></div>
+      <p class="rec-note" id="recNote">화면을 켜 둔 채로 두세요. 다른 앱으로 넘어가거나 화면을 잠그면 녹음이 멈출 수 있습니다.</p>
+    </div>
+
+    <div class="rec-controls">
+      <button class="round ghost" id="btnPause" type="button" aria-label="일시정지">
+        <span class="ico-pause"></span><span class="round-label">일시정지</span>
+      </button>
+      <button class="round stop" id="btnStop" type="button" aria-label="녹음 종료">
+        <span class="ico-stop"></span><span class="round-label">종료</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- 마이크 권한 안내 -->
+  <section class="screen" id="screen-permission" hidden>
+    <div class="center-box">
+      <h1>마이크를 사용할 수 없습니다</h1>
+      <p class="sub" id="permReason"></p>
+      <ol class="steps">
+        <li>아래 <b>다시 시도</b>를 누르고, 권한 창이 뜨면 <b>허용</b>을 누르세요.</li>
+        <li>권한 창이 뜨지 않으면 아이폰 <b>설정 → 앱 → Safari → 마이크</b>를 <b>허용</b>으로 바꾼 뒤 앱을 다시 여세요.</li>
+        <li>통화 중이거나 다른 앱이 마이크를 쓰고 있으면 종료 후 다시 시도하세요.</li>
+      </ol>
+      <button class="btn primary block" id="btnRetryMic" type="button">다시 시도</button>
+      <button class="btn block" data-go="list" type="button">녹음 목록으로</button>
+    </div>
+  </section>
+
+  <!-- 목록 -->
+  <section class="screen" id="screen-list" hidden>
+    <header class="bar">
+      <span class="bar-title strong">미팅 녹음</span>
+      <button class="link" id="btnSettings" type="button">설정</button>
+    </header>
+    <div class="page">
+      <button class="btn primary block big" id="btnNew" type="button"><span class="dot light"></span>새 녹음</button>
+      <div id="installTip" class="notice" hidden>
+        Safari 하단의 <b>공유</b> 버튼 → <b>홈 화면에 추가</b>를 누르면 앱처럼 사용할 수 있습니다.
+      </div>
+      <div id="keyTip" class="notice" hidden>
+        텍스트 변환을 쓰려면 <button class="inline-link" type="button" data-open-settings>설정</button>에서 AssemblyAI API 키를 입력하세요.
+      </div>
+      <ul class="list" id="meetingList"></ul>
+      <p class="empty" id="listEmpty">녹음한 미팅이 없습니다.</p>
+    </div>
+  </section>
+
+  <!-- 상세 -->
+  <section class="screen" id="screen-detail" hidden>
+    <header class="bar">
+      <button class="link" data-go="list" type="button">‹ 목록</button>
+      <span class="bar-spacer"></span>
+      <button class="link" id="btnNew2" type="button">새 녹음</button>
+    </header>
+    <div class="page">
+      <input class="title-input" id="detTitle" type="text" aria-label="미팅 제목">
+      <p class="sub" id="detMeta"></p>
+      <div id="detAudio" class="audio-list"></div>
+      <p class="hint" id="detSegNote" hidden></p>
+
+      <div class="card" id="trBox">
+        <!-- 변환 전 -->
+        <div id="trIdle">
+          <h2>텍스트 변환 (연자 자동 구분)</h2>
+          <label class="field">참석 인원
+            <select id="trSpeakers">
+              <option value="">자동으로 판단</option>
+              <option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option>
+            </select>
+          </label>
+          <p class="hint">인원을 정확히 알면 선택하세요. 연자 구분이 더 정확해집니다.</p>
+          <button class="btn primary block" id="btnTranscribe" type="button">텍스트 변환 시작</button>
+        </div>
+        <!-- 변환 중 -->
+        <div id="trBusy" hidden>
+          <h2>텍스트 변환 중</h2>
+          <p class="progress-text" id="trProgress"></p>
+          <div class="meter"><div id="trBar" class="indeterminate"></div></div>
+          <p class="hint">앱을 닫아도 됩니다. 다시 열면 이어서 확인합니다.</p>
+        </div>
+        <!-- 오류 -->
+        <div id="trError" hidden>
+          <h2>변환하지 못했습니다</h2>
+          <p class="sub" id="trErrorMsg"></p>
+          <button class="btn primary block" id="btnRetryTr" type="button">다시 시도</button>
+        </div>
+        <!-- 완료 -->
+        <div id="trDone" hidden>
+          <div class="card-head">
+            <h2>미팅 기록</h2>
+            <span class="hint" id="trCount"></span>
+          </div>
+          <div class="share-row">
+            <button class="btn primary" id="btnCopyClaude" type="button">Claude용 복사</button>
+            <button class="btn" id="btnShareText" type="button">공유</button>
+          </div>
+          <p class="hint">"Claude용 복사"를 누른 뒤 Claude 앱에 붙여 넣으면 정리 요청 문구까지 함께 들어갑니다.</p>
+          <div id="transcript" class="transcript"></div>
+          <button class="btn small" id="btnRetranscribe" type="button">다시 변환</button>
+        </div>
+      </div>
+
+      <div class="danger-row">
+        <button class="btn" id="btnShareAudio" type="button">음성 파일 저장/공유</button>
+        <button class="btn ghost" id="btnDelete" type="button">삭제</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 설정 -->
+  <dialog id="settingsDialog">
+    <form method="dialog" class="form">
+      <h2>설정</h2>
+      <label class="field">AssemblyAI API 키
+        <input id="setKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="키를 붙여 넣으세요">
+      </label>
+      <p class="hint">키는 이 휴대폰에만 저장되며, 음성 파일을 변환할 때 AssemblyAI로만 전송됩니다.</p>
+      <label class="check"><input type="checkbox" id="setAutoStart"> 앱을 열면 바로 녹음 시작</label>
+      <label class="field">Claude 정리 요청 문구
+        <textarea id="setPrompt" rows="8"></textarea>
+      </label>
+      <button class="btn small" id="btnResetPrompt" type="button">기본 문구로 되돌리기</button>
+      <p class="hint" id="storageInfo"></p>
+      <div class="form-actions">
+        <button class="btn" value="cancel" type="submit">취소</button>
+        <button class="btn primary" value="save" type="submit">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="store.js"></script>
+  <script src="transcribe.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
